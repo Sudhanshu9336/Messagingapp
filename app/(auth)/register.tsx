@@ -37,7 +37,9 @@ export default function RegisterScreen() {
       await login(username.trim(), gender || undefined, bio || undefined);
       router.replace('/(tabs)');
     } catch (error) {
-      Alert.alert('Registration Failed', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Registration error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
+      Alert.alert('Registration Failed', errorMessage);
     } finally {
       setLoading(false);
     }
