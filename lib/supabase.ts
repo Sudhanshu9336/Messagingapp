@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Temporary mock Supabase client for development
+const supabaseUrl = 'https://mock-project.supabase.co';
+const supabaseKey = 'mock-anon-key';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 

@@ -19,27 +19,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     
+    const initializeAuth = async () => {
+      try {
+        const userData = await authManager.loginWithSession();
+        if (isMounted) {
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
     initializeAuth();
     
     return () => {
       isMounted = false;
     };
   }, []);
-
-  const initializeAuth = async () => {
-    try {
-      const userData = await authManager.loginWithSession();
-      if (isMounted) {
-        setUser(userData);
-      }
-    } catch (error) {
-      console.error('Auth initialization failed:', error);
-    } finally {
-      if (isMounted) {
-        setLoading(false);
-      }
-    }
-  };
 
   const login = async (username: string, gender?: string, bio?: string) => {
     try {
