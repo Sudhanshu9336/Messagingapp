@@ -5,8 +5,11 @@ import { Database } from '@/types/database';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables. Please set up your Supabase connection.');
-}
+// Use placeholder values if environment variables are not set
+const defaultUrl = 'https://placeholder.supabase.co';
+const defaultKey = 'placeholder-anon-key';
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey);
+export const supabase = createClient<Database>(
+  supabaseUrl || defaultUrl, 
+  supabaseKey || defaultKey
+);
