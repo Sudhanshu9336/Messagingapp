@@ -17,17 +17,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const authManager = AuthManager.getInstance();
 
   useEffect(() => {
+    let isMounted = true;
+    
     initializeAuth();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const initializeAuth = async () => {
     try {
       const userData = await authManager.loginWithSession();
-      setUser(userData);
+      if (isMounted) {
+        setUser(userData);
+      }
     } catch (error) {
       console.error('Auth initialization failed:', error);
     } finally {
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     }
   };
 
