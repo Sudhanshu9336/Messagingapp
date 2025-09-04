@@ -38,11 +38,40 @@ export class AuthManager {
   // Register new user
   async register(username: string, gender?: string, bio?: string): Promise<UserProfile> {
     try {
+      // Check if username already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', username)
+        .single();
+
+      if (existingUser) {
+        throw new Error('Username already taken. Please choose a different username.');
+      }
+
       // Generate encryption key pair
       const keyPair = this.encryptionManager.generateKeyPair();
       
-      // Generate unique user ID
-      const userId = this.generateUserId();
+      // Generate unique user ID and check for conflicts
+      let userId: number;
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      do {
+        userId = this.generateUserId();
+        const { data: existingId } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('user_id', userId)
+          .single();
+        
+        if (!existingId) break;
+        attempts++;
+      } while (attempts < maxAttempts);
+      
+      if (attempts >= maxAttempts) {
+        throw new Error('Unable to generate unique user ID. Please try again.');
+      }
       
       // Create temporary session
       const sessionId = Math.random().toString(36).substring(7);
@@ -51,7 +80,6 @@ export class AuthManager {
       const { data, error } = await supabase
         .from('profiles')
         .insert({
-          id: sessionId,
           user_id: userId,
           username,
           gender,
@@ -61,18 +89,32 @@ export class AuthManager {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        if (error.code === 'PGRST116') {
+          throw new Error('Unable to connect to database. Please check your internet connection and try again.');
+        } else if (error.message.includes('duplicate')) {
+          throw new Error('Username or ID already exists. Please try again.');
+        } else {
+          throw new Error(`Registration failed: ${error.message || 'Unknown database error'}`);
+        }
+      }
 
       this.currentUser = data;
       
       // Store credentials locally
-      await AsyncStorage.setItem('user_session', sessionId);
+      await AsyncStorage.setItem('user_session', data.id);
       await AsyncStorage.setItem('private_key', keyPair.privateKey);
       await AsyncStorage.setItem('user_profile', JSON.stringify(data));
 
       return data;
     } catch (error) {
-      throw new Error(`Registration failed: ${error}`);
+      console.error('Registration error:', error);
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Registration failed due to an unexpected error. Please try again.');
+      }
     }
   }
 
