@@ -4,10 +4,17 @@ import * as Crypto from 'expo-crypto';
 import { AppState } from 'react-native';
 import { useEffect } from 'react';
 import { markActive } from './lib/activity';
-import { useAuth } from './lib/auth'; // assuming you already have a hook for auth
+import { useAuth } from './lib/auth';
 
-export default function AppRoot() {
-  const { profile } = useAuth(); // get the current logged-in profile
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { AuthProvider } from '@/contexts/AuthContext';
+import 'react-native-url-polyfill/auto';
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+
+export default function RootLayout() {
+  useFrameworkReady();
+  const { profile } = useAuth();
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -16,13 +23,22 @@ export default function AppRoot() {
       }
     });
 
-    return () => subscription.remove();
+    // 👇 If you're on RN >= 0.72, this should just be `subscription()`
+    return () => subscription.remove?.() ?? subscription();
   }, [profile?.id]);
 
   return (
-    // your navigation / routes
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <StatusBar style="auto" />
+    </AuthProvider>
   );
 }
+
 
 // Polyfill crypto functions for React Native
 if (!global.atob) global.atob = decode;
