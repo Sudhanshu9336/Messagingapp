@@ -38,12 +38,7 @@ if (!global.crypto) {
 // Additional polyfills for Node.js compatibility
 if (typeof global !== 'undefined') {
   // Ensure TextEncoder/TextDecoder are available
-  if (!global.TextEncoder) {
-    global.TextEncoder = require('util').TextEncoder;
-  }
-  if (!global.TextDecoder) {
-    global.TextDecoder = require('util').TextDecoder;
-  }
+  // TextEncoder/TextDecoder are available in modern React Native environments
 }
 
 import { useEffect } from 'react';

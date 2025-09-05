@@ -123,10 +123,10 @@ export default function RegisterScreen() {
           <View style={styles.infoBox}>
             <Users size={20} color="#25D366" />
             <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>Unique User ID</Text>
+              <Text style={styles.infoTitle}>Your Unique ID</Text>
               <Text style={styles.infoText}>
-                You'll receive a unique 8-digit ID that others can use to find you, 
-                plus a QR code for easy connection.
+                You'll get a unique 8-digit ID for secure identification. 
+                Your display name can be customized by your contacts.
               </Text>
             </View>
           </View>
