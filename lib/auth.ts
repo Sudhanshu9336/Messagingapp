@@ -331,13 +331,4 @@ export class AuthManager {
       throw new Error(`Logout failed: ${error}`);
     }
   }
-
-  // Cleanup inactive profiles (admin function)
-  static async cleanupInactiveProfiles(): Promise<void> {
-    try {
-      await supabase.rpc('cleanup_inactive_profiles');
-    } catch (error) {
-      console.error('Cleanup failed:', error);
-    }
-  }
 }
