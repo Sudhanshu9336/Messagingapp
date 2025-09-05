@@ -9,10 +9,8 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthManager, UserProfile } from '@/lib/auth';
-import { ChatManager } from '@/lib/chat';
 import { QRManager, QRUserData } from '@/lib/qr';
 import { Search, UserPlus, QrCode, Users, MessageCircle } from 'lucide-react-native';
 
@@ -24,7 +22,6 @@ export default function ContactsScreen() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrInput, setQrInput] = useState('');
   const authManager = AuthManager.getInstance();
-  const chatManager = ChatManager.getInstance();
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -57,13 +54,20 @@ export default function ContactsScreen() {
     return () => clearTimeout(debounceTimer);
   }, [searchQuery]);
 
-  const handleStartChat = async (contact: UserProfile) => {
-    try {
-      const chat = await chatManager.createChat([contact.id], false);
-      router.push(`/chat/${chat.id}`);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to start chat');
-    }
+  const handleConnect = async (contact: UserProfile) => {
+    Alert.alert(
+      'Connect with User',
+      `Connect with ${contact.username}? In a real peer-to-peer app, this would establish a direct connection.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Connect', 
+          onPress: () => {
+            Alert.alert('Connected', `You are now connected with ${contact.username}!`);
+          }
+        },
+      ]
+    );
   };
 
   const handleQRConnect = async () => {
@@ -90,8 +94,8 @@ export default function ContactsScreen() {
         return;
       }
 
-      // Start chat with the user
-      await handleStartChat(contact);
+      // Connect with the user
+      await handleConnect(contact);
       setShowQRModal(false);
       setQrInput('');
     } catch (error) {
@@ -102,7 +106,7 @@ export default function ContactsScreen() {
   const renderSearchResult = ({ item }: { item: UserProfile }) => (
     <TouchableOpacity
       style={styles.contactItem}
-      onPress={() => handleStartChat(item)}
+      onPress={() => handleConnect(item)}
     >
       <View style={styles.contactAvatar}>
         <Text style={styles.contactInitial}>
@@ -118,11 +122,14 @@ export default function ContactsScreen() {
             {item.bio}
           </Text>
         )}
+        <Text style={styles.contactActivity}>
+          Last active: {new Date(item.last_activity).toLocaleDateString()}
+        </Text>
       </View>
       
       <TouchableOpacity
-        style={styles.chatButton}
-        onPress={() => handleStartChat(item)}
+        style={styles.connectButton}
+        onPress={() => handleConnect(item)}
       >
         <MessageCircle size={20} color="#25D366" />
       </TouchableOpacity>
@@ -132,7 +139,7 @@ export default function ContactsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Contacts</Text>
+        <Text style={styles.headerTitle}>Find Contacts</Text>
         <TouchableOpacity
           style={styles.qrButton}
           onPress={() => setShowQRModal(true)}
@@ -163,11 +170,6 @@ export default function ContactsScreen() {
           <QrCode size={20} color="#25D366" />
           <Text style={styles.actionButtonText}>Scan QR Code</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton}>
-          <Users size={20} color="#25D366" />
-          <Text style={styles.actionButtonText}>Create Group</Text>
-        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -182,6 +184,14 @@ export default function ContactsScreen() {
               <Text style={styles.emptyText}>No users found</Text>
               <Text style={styles.emptySubtext}>
                 Try searching with a different username or User ID
+              </Text>
+            </View>
+          ) : !searchQuery.trim() ? (
+            <View style={styles.emptyContainer}>
+              <Users size={60} color="#ddd" />
+              <Text style={styles.emptyText}>Search for contacts</Text>
+              <Text style={styles.emptySubtext}>
+                Enter a username or User ID to find people to connect with
               </Text>
             </View>
           ) : null
@@ -342,8 +352,13 @@ const styles = StyleSheet.create({
   contactBio: {
     fontSize: 12,
     color: '#666',
+    marginBottom: 2,
   },
-  chatButton: {
+  contactActivity: {
+    fontSize: 11,
+    color: '#999',
+  },
+  connectButton: {
     padding: 8,
   },
   emptyContainer: {

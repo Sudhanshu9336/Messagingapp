@@ -1,111 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
-  RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { ChatManager, Chat } from '@/lib/chat';
-import { MessageCircle, Plus, Users, Clock } from 'lucide-react-native';
+import { MessageCircle, Users, Shield, Info } from 'lucide-react-native';
 
-export default function ChatsScreen() {
+export default function HomeScreen() {
   const { user } = useAuth();
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const chatManager = ChatManager.getInstance();
-
-  useEffect(() => {
-    if (user) {
-      loadChats();
-    }
-  }, [user]);
-
-  const loadChats = async () => {
-    try {
-      const userChats = await chatManager.getUserChats();
-      setChats(userChats);
-    } catch (error) {
-      console.error('Failed to load chats:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadChats();
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    
-    if (diff < 86400000) { // Less than 24 hours
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (diff < 604800000) { // Less than 7 days
-      return date.toLocaleDateString([], { weekday: 'short' });
-    } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
-  };
-
-  const renderChatItem = ({ item }: { item: Chat }) => (
-    <TouchableOpacity
-      style={styles.chatItem}
-      onPress={() => router.push(`/chat/${item.id}`)}
-    >
-      <View style={styles.chatAvatar}>
-        {item.is_group ? (
-          <Users size={24} color="#999" />
-        ) : (
-          <MessageCircle size={24} color="#999" />
-        )}
-      </View>
-      
-      <View style={styles.chatContent}>
-        <View style={styles.chatHeader}>
-          <Text style={styles.chatName} numberOfLines={1}>
-            {item.name || `Chat ${item.id.slice(0, 8)}`}
-          </Text>
-          <Text style={styles.chatTime}>
-            {formatTime(item.updated_at)}
-          </Text>
-        </View>
-        
-        <Text style={styles.chatLastMessage} numberOfLines={1}>
-          {item.last_message?.content || 'No messages yet'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <MessageCircle size={80} color="#ddd" />
-      <Text style={styles.emptyTitle}>No chats yet</Text>
-      <Text style={styles.emptyText}>
-        Start a conversation by adding contacts or creating a group
-      </Text>
-      <TouchableOpacity
-        style={styles.emptyButton}
-        onPress={() => router.push('/(tabs)/contacts')}
-      >
-        <Text style={styles.emptyButtonText}>Add Contacts</Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   if (!user) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Please log in to view chats</Text>
+        <Text>Please log in to continue</Text>
       </View>
     );
   }
@@ -113,26 +23,66 @@ export default function ChatsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Chats</Text>
+        <Text style={styles.headerTitle}>SecureChat</Text>
+        <Text style={styles.headerSubtitle}>Profile-Only Messaging</Text>
+      </View>
+
+      <View style={styles.welcomeSection}>
+        <Text style={styles.welcomeText}>Welcome, {user.username}!</Text>
+        <Text style={styles.userIdText}>Your ID: {user.user_id}</Text>
+      </View>
+
+      <View style={styles.infoSection}>
+        <View style={styles.infoCard}>
+          <Shield size={32} color="#25D366" />
+          <Text style={styles.infoTitle}>Privacy First</Text>
+          <Text style={styles.infoText}>
+            No messages or files are stored in our database. Only your profile exists for contact discovery.
+          </Text>
+        </View>
+
+        <View style={styles.infoCard}>
+          <MessageCircle size={32} color="#25D366" />
+          <Text style={styles.infoTitle}>Peer-to-Peer</Text>
+          <Text style={styles.infoText}>
+            All communication happens directly between devices using end-to-end encryption.
+          </Text>
+        </View>
+
+        <View style={styles.infoCard}>
+          <Users size={32} color="#25D366" />
+          <Text style={styles.infoTitle}>Find Contacts</Text>
+          <Text style={styles.infoText}>
+            Use the Contacts tab to find friends by username, ID, or QR code.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.actions}>
         <TouchableOpacity
-          style={styles.addButton}
+          style={styles.primaryButton}
           onPress={() => router.push('/(tabs)/contacts')}
         >
-          <Plus size={24} color="#25D366" />
+          <Users size={20} color="#fff" />
+          <Text style={styles.primaryButtonText}>Find Contacts</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => router.push('/(tabs)/profile')}
+        >
+          <Text style={styles.secondaryButtonText}>View My Profile</Text>
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={chats}
-        renderItem={renderChatItem}
-        keyExtractor={(item) => item.id}
-        style={styles.chatsList}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={loading ? null : renderEmptyState}
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={styles.footer}>
+        <View style={styles.footerItem}>
+          <Info size={16} color="#999" />
+          <Text style={styles.footerText}>
+            Profiles inactive for 60+ days are automatically deleted
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -149,94 +99,113 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
-  },
-  addButton: {
-    padding: 8,
-  },
-  chatsList: {
-    flex: 1,
-  },
-  chatItem: {
-    flexDirection: 'row',
-    padding: 16,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
-  },
-  chatAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f5f5f5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  chatContent: {
-    flex: 1,
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    color: '#25D366',
     marginBottom: 4,
   },
-  chatName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    flex: 1,
-  },
-  chatTime: {
-    fontSize: 12,
-    color: '#999',
-  },
-  chatLastMessage: {
+  headerSubtitle: {
     fontSize: 14,
     color: '#666',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  welcomeSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 30,
     alignItems: 'center',
-    padding: 40,
   },
-  emptyTitle: {
-    fontSize: 20,
+  welcomeText: {
+    fontSize: 24,
     fontWeight: '600',
     color: '#333',
-    marginTop: 20,
     marginBottom: 8,
   },
-  emptyText: {
+  userIdText: {
+    fontSize: 16,
+    color: '#666',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  infoSection: {
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  infoCard: {
+    backgroundColor: '#f9f9f9',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  infoText: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 30,
   },
-  emptyButton: {
+  actions: {
+    paddingHorizontal: 20,
+    paddingVertical: 30,
+    gap: 12,
+  },
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#25D366',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    gap: 8,
   },
-  emptyButtonText: {
+  primaryButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  secondaryButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  footer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  footerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
   },
 });

@@ -12,10 +12,10 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { QRManager } from '@/lib/qr';
 import QRCode from 'react-native-qrcode-svg';
-import { User, Copy, Share2, CreditCard as Edit3, Check, X, QrCode, Shield, Hash } from 'lucide-react-native';
+import { User, Copy, Share2, CreditCard as Edit3, Check, X, QrCode, Shield, Hash, Trash2 } from 'lucide-react-native';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, deleteProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [editedBio, setEditedBio] = useState(user?.bio || '');
 
@@ -62,6 +62,28 @@ export default function ProfileScreen() {
     // In a real app, you'd save to the database here
     Alert.alert('Success', 'Bio updated successfully');
     setIsEditing(false);
+  };
+
+  const handleDeleteProfile = () => {
+    Alert.alert(
+      'Delete Profile',
+      'Are you sure you want to permanently delete your profile? This action cannot be undone and will remove all your data.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteProfile();
+              Alert.alert('Profile Deleted', 'Your profile has been permanently deleted.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete profile. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleLogout = () => {
@@ -212,6 +234,11 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.actions}>
+        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteProfile}>
+          <Trash2 size={18} color="#dc2626" />
+          <Text style={styles.deleteButtonText}>Delete Profile</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
@@ -222,7 +249,10 @@ export default function ProfileScreen() {
           Created: {new Date(user.created_at).toLocaleDateString()}
         </Text>
         <Text style={styles.footerText}>
-          SecureChat • End-to-End Encrypted
+          Last Active: {new Date(user.last_activity).toLocaleDateString()}
+        </Text>
+        <Text style={styles.footerText}>
+          SecureChat • Profile-Only Storage
         </Text>
       </View>
     </ScrollView>
@@ -442,16 +472,32 @@ const styles = StyleSheet.create({
   actions: {
     paddingHorizontal: 20,
     paddingVertical: 20,
+    gap: 12,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fee2e2',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    gap: 8,
+  },
+  deleteButtonText: {
+    color: '#dc2626',
+    fontSize: 16,
+    fontWeight: '600',
   },
   logoutButton: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#f5f5f5',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
     alignItems: 'center',
   },
   logoutButtonText: {
-    color: '#dc2626',
+    color: '#666',
     fontSize: 16,
     fontWeight: '600',
   },

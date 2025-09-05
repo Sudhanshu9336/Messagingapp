@@ -7,11 +7,11 @@ export interface UserProfile {
   user_id: number;
   username: string;
   gender?: string;
-  avatar_url?: string;
   bio?: string;
   public_key: string;
   created_at: string;
   updated_at: string;
+  last_activity: string;
 }
 
 export class AuthManager {
@@ -30,190 +30,144 @@ export class AuthManager {
     return AuthManager.instance;
   }
 
-  // Generate unique user ID
+  // Generate unique 8-digit user ID
   private generateUserId(): number {
-    return Math.floor(10000000 + Math.random() * 90000000); // 8-digit ID
+    return Math.floor(10000000 + Math.random() * 90000000);
   }
 
-  // Check Supabase connection
-  private async checkConnection(): Promise<boolean> {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('count')
-        .limit(1);
-      
-      return !error;
-    } catch {
-      return false;
+  // Validate username format
+  private validateUsername(username: string): void {
+    if (!username || username.length < 3) {
+      throw new Error('Username must be at least 3 characters long');
     }
+    if (username.length > 20) {
+      throw new Error('Username must be less than 20 characters');
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      throw new Error('Username can only contain letters, numbers, and underscores');
+    }
+  }
+
+  // Check if username is available
+  private async checkUsernameAvailability(username: string): Promise<void> {
+    const { data: existingUser, error } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', username)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw new Error('Unable to check username availability. Please try again.');
+    }
+
+    if (existingUser) {
+      throw new Error('Username already taken. Please choose a different username.');
+    }
+  }
+
+  // Generate unique user ID (with collision checking)
+  private async generateUniqueUserId(): Promise<number> {
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (attempts < maxAttempts) {
+      const userId = this.generateUserId();
+      
+      const { data: existingId } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (!existingId) {
+        return userId;
+      }
+      
+      attempts++;
+    }
+
+    throw new Error('Unable to generate unique user ID. Please try again.');
+  }
+
+  // Create user profile in database
+  private async createProfileInDatabase(
+    userId: number,
+    username: string,
+    publicKey: string,
+    gender?: string,
+    bio?: string
+  ): Promise<UserProfile> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert({
+        user_id: userId,
+        username,
+        gender,
+        bio,
+        public_key: publicKey,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Profile creation error:', error);
+      if (error.code === 'PGRST116') {
+        throw new Error('Unable to connect to database. Please check your internet connection.');
+      } else if (error.message?.includes('duplicate')) {
+        throw new Error('Username or ID already exists. Please try again.');
+      } else {
+        throw new Error('Failed to create user profile. Please try again.');
+      }
+    }
+
+    if (!data) {
+      throw new Error('Failed to create user profile. Please try again.');
+    }
+
+    return data;
+  }
+
+  // Store credentials locally
+  private async storeCredentials(profile: UserProfile, privateKey: string): Promise<void> {
+    await AsyncStorage.setItem('user_session', profile.id);
+    await AsyncStorage.setItem('private_key', privateKey);
+    await AsyncStorage.setItem('user_profile', JSON.stringify(profile));
   }
 
   // Register new user
   async register(username: string, gender?: string, bio?: string): Promise<UserProfile> {
     try {
-      // Validate username
-      if (!username || username.length < 3) {
-        throw new Error('Username must be at least 3 characters long');
-      }
+      // Validate input
+      this.validateUsername(username);
 
-      // Check if username already exists
-      const { data: existingUser, error: searchError } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('username', username)
-        .single();
+      // Check username availability
+      await this.checkUsernameAvailability(username);
 
-      if (searchError && searchError.code !== 'PGRST116') {
-        throw new Error('Unable to check username availability. Please try again.');
-      }
-
-      if (existingUser) {
-        throw new Error('Username already taken. Please choose a different username.');
-      }
-
-      // Generate encryption key pair
+      // Generate encryption keys
       const keyPair = this.encryptionManager.generateKeyPair();
-
-      // Generate unique user ID and check for conflicts
-      let userId: number;
-      let attempts = 0;
-      const maxAttempts = 10;
-        // Create mock user profile for demo purposes
-        const userId = this.generateUserId();
-        const keyPair = this.encryptionManager.generateKeyPair();
-        
-        const mockUser: UserProfile = {
-          id: Math.random().toString(36).substring(7),
-          user_id: userId,
-          username,
-          gender,
-          bio,
-          public_key: keyPair.publicKey,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        
-        this.currentUser = mockUser;
-        
-        // Store credentials locally
-        await AsyncStorage.setItem('user_session', mockUser.id);
-        await AsyncStorage.setItem('private_key', keyPair.privateKey);
-        await AsyncStorage.setItem('user_profile', JSON.stringify(mockUser));
-        
-        return mockUser;
+      if (!keyPair || !keyPair.publicKey || !keyPair.privateKey) {
+        throw new Error('Failed to generate security keys.');
       }
 
-      try {
-        // Check network connectivity first
-        const { data: networkCheck, error: networkError } = await supabase
-          .from('profiles')
-          .select('count')
-          .limit(1);
-        
-        if (networkError) {
-          throw new Error('Network connection failed. Please check your internet connection.');
-        }
+      // Generate unique user ID
+      const userId = await this.generateUniqueUserId();
 
-        // Check if username already exists
-        const { data: existingUser, error: searchError } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('username', username)
-          .single();
+      // Create profile in database
+      const profile = await this.createProfileInDatabase(
+        userId,
+        username,
+        keyPair.publicKey,
+        gender,
+        bio
+      );
 
-        if (searchError && searchError.code !== 'PGRST116') {
-          throw new Error('Database error. Please try again.');
-        }
-
-        if (existingUser) {
-          throw new Error('Username already taken. Please choose a different username.');
-        }
-      } catch (supabaseError) {
-        // If Supabase connection fails, create mock user
-        const userId = this.generateUserId();
-        const keyPair = this.encryptionManager.generateKeyPair();
-        
-        const mockUser: UserProfile = {
-          id: Math.random().toString(36).substring(7),
-          user_id: userId,
-          username,
-          gender,
-          bio,
-          public_key: keyPair.publicKey,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        
-        this.currentUser = mockUser;
-        
-        // Store credentials locally
-        await AsyncStorage.setItem('user_session', mockUser.id);
-        await AsyncStorage.setItem('private_key', keyPair.privateKey);
-        await AsyncStorage.setItem('user_profile', JSON.stringify(mockUser));
-        
-        return mockUser;
-      }
-
-      // Generate encryption key pair with enhanced security
-      const keyPair = this.encryptionManager.generateKeyPair();
-      
-      // Generate unique user ID and check for conflicts
-      let userId: number;
-      let attempts = 0;
-      const maxAttempts = 10;
-      
-      do {
-        userId = this.generateUserId();
-        const { data: existingId } = await supabase
-          .from('profiles')
-          .select('user_id')
-          .eq('user_id', userId)
-          .single();
-        
-        if (!existingId) break;
-        attempts++;
-      } while (attempts < maxAttempts);
-      
-      if (attempts >= maxAttempts) {
-        throw new Error('Unable to generate unique user ID. Please try again.');
-      }
-      
-      // Create temporary session
-      const sessionId = Math.random().toString(36).substring(7);
-      
-      // Insert user profile
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: userId,
-          username,
-          gender,
-          bio,
-          public_key: keyPair.publicKey,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Supabase error:', error);
-        if (error.code === 'PGRST116') {
-          throw new Error('Unable to connect to database. Please check your internet connection and try again.');
-        } else if (error.message.includes('duplicate')) {
-          throw new Error('Username or ID already exists. Please try again.');
-        } else {
-          throw new Error(`Registration failed: ${error.message || 'Unknown database error'}`);
-        }
-      }
-
-      this.currentUser = data;
-      
       // Store credentials locally
-      await AsyncStorage.setItem('user_session', data.id);
-      await AsyncStorage.setItem('private_key', keyPair.privateKey);
-      await AsyncStorage.setItem('user_profile', JSON.stringify(data));
+      await this.storeCredentials(profile, keyPair.privateKey);
 
-      return data;
+      // Set current user
+      this.currentUser = profile;
+
+      return profile;
     } catch (error) {
       console.error('Registration error:', error);
       if (error instanceof Error) {
@@ -224,7 +178,7 @@ export class AuthManager {
     }
   }
 
-  // Login with session
+  // Login with stored session
   async loginWithSession(): Promise<UserProfile | null> {
     try {
       const sessionId = await AsyncStorage.getItem('user_session');
@@ -243,14 +197,51 @@ export class AuthManager {
         privateKey,
       });
 
+      // Update last activity
+      await this.updateLastActivity(profile.id);
+
       this.currentUser = profile;
       return profile;
     } catch (error) {
+      console.error('Session login error:', error);
       return null;
     }
   }
 
-  // Search user by username or ID
+  // Update last activity timestamp
+  async updateLastActivity(profileId: string): Promise<void> {
+    try {
+      await supabase.rpc('update_last_activity', { profile_id: profileId });
+    } catch (error) {
+      console.warn('Failed to update last activity:', error);
+    }
+  }
+
+  // Delete user profile
+  async deleteProfile(): Promise<void> {
+    if (!this.currentUser) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      // Delete from database
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', this.currentUser.id);
+
+      if (error) {
+        throw new Error('Failed to delete profile from database');
+      }
+
+      // Clear local storage
+      await this.logout();
+    } catch (error) {
+      throw new Error(`Profile deletion failed: ${error}`);
+    }
+  }
+
+  // Search users by username or ID
   async searchUser(query: string): Promise<UserProfile[]> {
     try {
       const { data, error } = await supabase
@@ -282,16 +273,27 @@ export class AuthManager {
     }
   }
 
+  // Get current user
   getCurrentUser(): UserProfile | null {
     return this.currentUser;
   }
 
+  // Logout and clear session
   async logout(): Promise<void> {
     try {
       await AsyncStorage.multiRemove(['user_session', 'private_key', 'user_profile']);
       this.currentUser = null;
     } catch (error) {
       throw new Error(`Logout failed: ${error}`);
+    }
+  }
+
+  // Cleanup inactive profiles (admin function)
+  static async cleanupInactiveProfiles(): Promise<void> {
+    try {
+      await supabase.rpc('cleanup_inactive_profiles');
+    } catch (error) {
+      console.error('Cleanup failed:', error);
     }
   }
 }

@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AuthManager, UserProfile } from '@/lib/auth';
+import { cleanupManager } from '@/lib/cleanup';
 
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   login: (username: string, gender?: string, bio?: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteProfile: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -34,10 +36,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
     
+    // Start cleanup process
+    cleanupManager.startCleanupProcess();
+    
     initializeAuth();
     
     return () => {
       isMounted = false;
+      cleanupManager.stopCleanupProcess();
     };
   }, []);
 
@@ -59,6 +65,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteProfile = async () => {
+    try {
+      await authManager.deleteProfile();
+      setUser(null);
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const refreshUser = async () => {
     try {
       const userData = await authManager.loginWithSession();
@@ -69,7 +84,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      login, 
+      logout, 
+      deleteProfile,
+      refreshUser 
+    }}>
       {children}
     </AuthContext.Provider>
   );
