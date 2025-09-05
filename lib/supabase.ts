@@ -5,13 +5,15 @@ import type { Database } from '@/types/database';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+// Validate credentials
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase credentials. Please check your environment variables.');
+  console.error('Supabase credentials are missing in environment variables');
 }
 
+// Create client with error handling
 export const supabase = createClient<Database>(
-  supabaseUrl,
-  supabaseKey,
+  supabaseUrl || '',
+  supabaseKey || '',
   {
     auth: {
       persistSession: true,

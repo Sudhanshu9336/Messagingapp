@@ -35,6 +35,20 @@ export class AuthManager {
     return Math.floor(10000000 + Math.random() * 90000000); // 8-digit ID
   }
 
+  // Check Supabase connection
+  private async checkConnection(): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('count')
+        .limit(1);
+      
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+
   // Register new user
   async register(username: string, gender?: string, bio?: string): Promise<UserProfile> {
     try {
@@ -43,13 +57,28 @@ export class AuthManager {
         throw new Error('Username must be at least 3 characters long');
       }
 
-      // Check if we have valid Supabase credentials
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-      
-      if (!supabaseUrl || !supabaseKey || 
-          supabaseUrl.includes('your-project') || 
-          supabaseKey.includes('your-anon-key')) {
+      // Check if username already exists
+      const { data: existingUser, error: searchError } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', username)
+        .single();
+
+      if (searchError && searchError.code !== 'PGRST116') {
+        throw new Error('Unable to check username availability. Please try again.');
+      }
+
+      if (existingUser) {
+        throw new Error('Username already taken. Please choose a different username.');
+      }
+
+      // Generate encryption key pair
+      const keyPair = this.encryptionManager.generateKeyPair();
+
+      // Generate unique user ID and check for conflicts
+      let userId: number;
+      let attempts = 0;
+      const maxAttempts = 10;
         // Create mock user profile for demo purposes
         const userId = this.generateUserId();
         const keyPair = this.encryptionManager.generateKeyPair();

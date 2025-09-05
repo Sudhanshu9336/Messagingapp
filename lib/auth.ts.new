@@ -1,0 +1,194 @@
+import { supabase } from './supabase';
+import { EncryptionManager } from './encryption';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export interface UserProfile {
+  id: string;
+  user_id: number;
+  username: string;
+  gender?: string;
+  avatar_url?: string;
+  bio?: string;
+  public_key: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export class AuthManager {
+  private static instance: AuthManager;
+  private currentUser: UserProfile | null = null;
+  private encryptionManager: EncryptionManager;
+
+  constructor() {
+    this.encryptionManager = EncryptionManager.getInstance();
+  }
+
+  static getInstance(): AuthManager {
+    if (!AuthManager.instance) {
+      AuthManager.instance = new AuthManager();
+    }
+    return AuthManager.instance;
+  }
+
+  // Generate unique user ID
+  private generateUserId(): number {
+    return Math.floor(10000000 + Math.random() * 90000000); // 8-digit ID
+  }
+
+  // Register new user
+  async register(username: string, gender?: string, bio?: string): Promise<UserProfile> {
+    try {
+      // Validate username
+      if (!username || username.length < 3) {
+        throw new Error('Username must be at least 3 characters long');
+      }
+
+      // Test database connection and check for existing username
+      const { data: existingUser, error: usernameError } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', username)
+        .single();
+
+      // Handle connection errors
+      if (usernameError) {
+        console.error('Database connection error:', usernameError);
+        if (usernameError.message?.includes('network')) {
+          throw new Error('Network connection failed. Please check your internet connection.');
+        }
+        // If it's not a "not found" error, it's a real error
+        if (usernameError.code !== 'PGRST116') {
+          throw new Error('Database error. Please try again later.');
+        }
+      }
+
+      // Check if username exists
+      if (existingUser) {
+        throw new Error('Username already taken. Please choose a different username.');
+      }
+
+      // Generate encryption keys
+      const keyPair = this.encryptionManager.generateKeyPair();
+      if (!keyPair || !keyPair.publicKey || !keyPair.privateKey) {
+        throw new Error('Failed to generate security keys.');
+      }
+
+      // Generate unique user ID
+      const userId = this.generateUserId();
+
+      // Create the user profile
+      const { data: newProfile, error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: userId,
+          username,
+          gender,
+          bio,
+          public_key: keyPair.publicKey,
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Profile creation error:', createError);
+        if (createError.code === 'PGRST116') {
+          throw new Error('Unable to connect to database. Please check your internet connection.');
+        } else if (createError.message?.includes('duplicate')) {
+          throw new Error('Username or ID already exists. Please try again.');
+        } else {
+          throw new Error('Failed to create user profile. Please try again.');
+        }
+      }
+
+      if (!newProfile) {
+        throw new Error('Failed to create user profile. Please try again.');
+      }
+
+      // Store the profile and credentials
+      this.currentUser = newProfile;
+      await AsyncStorage.setItem('user_session', newProfile.id);
+      await AsyncStorage.setItem('private_key', keyPair.privateKey);
+      await AsyncStorage.setItem('user_profile', JSON.stringify(newProfile));
+
+      return newProfile;
+    } catch (error) {
+      console.error('Registration error:', error);
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Registration failed due to an unexpected error. Please try again.');
+      }
+    }
+  }
+
+  // Login with session
+  async loginWithSession(): Promise<UserProfile | null> {
+    try {
+      const sessionId = await AsyncStorage.getItem('user_session');
+      const privateKey = await AsyncStorage.getItem('private_key');
+      const profileData = await AsyncStorage.getItem('user_profile');
+
+      if (!sessionId || !privateKey || !profileData) {
+        return null;
+      }
+
+      const profile = JSON.parse(profileData);
+      
+      // Restore encryption keys
+      this.encryptionManager.setKeyPair({
+        publicKey: profile.public_key,
+        privateKey,
+      });
+
+      this.currentUser = profile;
+      return profile;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Search user by username or ID
+  async searchUser(query: string): Promise<UserProfile[]> {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`username.ilike.%${query}%,user_id.eq.${parseInt(query) || 0}`)
+        .limit(10);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      throw new Error(`Search failed: ${error}`);
+    }
+  }
+
+  // Get user by ID
+  async getUserById(userId: number): Promise<UserProfile | null> {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) return null;
+      return data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  getCurrentUser(): UserProfile | null {
+    return this.currentUser;
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await AsyncStorage.multiRemove(['user_session', 'private_key', 'user_profile']);
+      this.currentUser = null;
+    } catch (error) {
+      throw new Error(`Logout failed: ${error}`);
+    }
+  }
+}
