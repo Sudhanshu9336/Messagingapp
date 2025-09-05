@@ -1,6 +1,13 @@
 import { supabase } from './supabase';
 import { EncryptionManager } from './encryption';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { markActive } from './activity';
+
+// after successful login
+if (profileId) {
+  markActive(profileId);
+}
+
 
 export interface UserProfile {
   id: string;

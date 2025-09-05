@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { EncryptionManager } from './encryption';
 import { AuthManager, UserProfile } from './auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { markActive } from './activity'; // 👈 added import
 
 export interface Chat {
   id: string;
@@ -300,6 +301,9 @@ export class ChatManager {
 
       await supabase.from('message_status').insert(statusEntries);
 
+      // 👇 mark user active after sending
+      await markActive(currentUser.id);
+
       return {
         ...message,
         content, // Include decrypted content for sender
@@ -536,6 +540,12 @@ export class ChatManager {
 
           // Update message status to delivered
           this.updateMessageStatus(payload.payload.message_id, 'delivered');
+
+          // 👇 mark user active after receiving a message
+          const currentUser = this.authManager.getCurrentUser();
+          if (currentUser) {
+            markActive(currentUser.id);
+          }
         } catch (error) {
           console.error('Failed to decrypt message:', error);
         }

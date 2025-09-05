@@ -1,6 +1,28 @@
 import 'react-native-get-random-values';
 import { decode, encode } from 'base-64';
 import * as Crypto from 'expo-crypto';
+import { AppState } from 'react-native';
+import { useEffect } from 'react';
+import { markActive } from './lib/activity';
+import { useAuth } from './lib/auth'; // assuming you already have a hook for auth
+
+export default function AppRoot() {
+  const { profile } = useAuth(); // get the current logged-in profile
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && profile?.id) {
+        markActive(profile.id);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [profile?.id]);
+
+  return (
+    // your navigation / routes
+  );
+}
 
 // Polyfill crypto functions for React Native
 if (!global.atob) global.atob = decode;
