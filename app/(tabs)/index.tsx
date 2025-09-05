@@ -4,13 +4,19 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  FlatList,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { MessageCircle, Users, Shield, Info } from 'lucide-react-native';
+import { MessageCircle, Users, Shield, Info, Plus, Search } from 'lucide-react-native';
+import { ChatManager, Chat } from '@/lib/chat';
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const [chats, setChats] = React.useState<Chat[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const chatManager = ChatManager.getInstance();
 
   if (!user) {
     return (
@@ -20,69 +26,110 @@ export default function HomeScreen() {
     );
   }
 
+  React.useEffect(() => {
+    loadChats();
+  }, []);
+
+  const loadChats = async () => {
+    try {
+      const userChats = await chatManager.getUserChats();
+      setChats(userChats);
+    } catch (error) {
+      console.error('Failed to load chats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateChat = () => {
+    Alert.alert(
+      'New Chat',
+      'Choose chat type',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Direct Message', onPress: () => router.push('/(tabs)/contacts') },
+        { text: 'Group Chat', onPress: () => console.log('Create group') },
+      ]
+    );
+  };
+
+  const renderChatItem = ({ item }: { item: Chat }) => (
+    <TouchableOpacity
+      style={styles.chatItem}
+      onPress={() => console.log('Open chat:', item.id)}
+    >
+      <View style={styles.chatAvatar}>
+        <Text style={styles.chatInitial}>
+          {item.name ? item.name.charAt(0).toUpperCase() : 'C'}
+        </Text>
+      </View>
+      
+      <View style={styles.chatInfo}>
+        <Text style={styles.chatName}>
+          {item.name || `Chat ${item.id.slice(0, 8)}`}
+        </Text>
+        <Text style={styles.chatPreview}>
+          {item.is_group ? 'Group Chat' : 'Direct Message'}
+        </Text>
+        <Text style={styles.chatTime}>
+          {new Date(item.updated_at).toLocaleDateString()}
+        </Text>
+      </View>
+      
+      <View style={styles.chatMeta}>
+        {item.is_group && (
+          <View style={styles.groupBadge}>
+            <Users size={12} color="#666" />
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>SecureChat</Text>
-        <Text style={styles.headerSubtitle}>Profile-Only Messaging</Text>
-      </View>
-
-      <View style={styles.welcomeSection}>
-        <Text style={styles.welcomeText}>Welcome, {user.username}!</Text>
-        <Text style={styles.userIdText}>Your ID: {user.user_id}</Text>
-      </View>
-
-      <View style={styles.infoSection}>
-        <View style={styles.infoCard}>
-          <Shield size={32} color="#25D366" />
-          <Text style={styles.infoTitle}>Privacy First</Text>
-          <Text style={styles.infoText}>
-            No messages or files are stored in our database. Only your profile exists for contact discovery.
-          </Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Chats</Text>
+          <Text style={styles.headerSubtitle}>End-to-end encrypted</Text>
         </View>
-
-        <View style={styles.infoCard}>
-          <MessageCircle size={32} color="#25D366" />
-          <Text style={styles.infoTitle}>Peer-to-Peer</Text>
-          <Text style={styles.infoText}>
-            All communication happens directly between devices using end-to-end encryption.
-          </Text>
-        </View>
-
-        <View style={styles.infoCard}>
-          <Users size={32} color="#25D366" />
-          <Text style={styles.infoTitle}>Find Contacts</Text>
-          <Text style={styles.infoText}>
-            Use the Contacts tab to find friends by username, ID, or QR code.
-          </Text>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.headerButton} onPress={() => router.push('/(tabs)/contacts')}>
+            <Search size={24} color="#2563eb" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerButton} onPress={handleCreateChat}>
+            <Plus size={24} color="#2563eb" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => router.push('/(tabs)/contacts')}
-        >
-          <Users size={20} color="#fff" />
-          <Text style={styles.primaryButtonText}>Find Contacts</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => router.push('/(tabs)/profile')}
-        >
-          <Text style={styles.secondaryButtonText}>View My Profile</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.footer}>
-        <View style={styles.footerItem}>
-          <Info size={16} color="#999" />
-          <Text style={styles.footerText}>
-            Profiles inactive for 60+ days are automatically deleted
-          </Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading chats...</Text>
         </View>
-      </View>
+      ) : chats.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <MessageCircle size={80} color="#ddd" />
+          <Text style={styles.emptyTitle}>No chats yet</Text>
+          <Text style={styles.emptyText}>
+            Start a conversation by finding contacts or creating a group
+          </Text>
+          <TouchableOpacity
+            style={styles.startChatButton}
+            onPress={() => router.push('/(tabs)/contacts')}
+          >
+            <Text style={styles.startChatButtonText}>Find Contacts</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={chats}
+          renderItem={renderChatItem}
+          keyExtractor={(item) => item.id}
+          style={styles.chatsList}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 }
@@ -90,122 +137,133 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#e2e8f0',
+  },
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#25D366',
+    color: '#1e293b',
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#64748b',
   },
-  welcomeSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    alignItems: 'center',
-  },
-  welcomeText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  userIdText: {
-    fontSize: 16,
-    color: '#666',
-    backgroundColor: '#f5f5f5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  infoSection: {
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  infoCard: {
-    backgroundColor: '#f9f9f9',
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  actions: {
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    gap: 12,
-  },
-  primaryButton: {
+  headerRight: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#25D366',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
     gap: 8,
   },
-  primaryButtonText: {
+  headerButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+  },
+  chatsList: {
+    flex: 1,
+  },
+  chatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#f1f5f9',
+  },
+  chatAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  chatInitial: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  chatInfo: {
+    flex: 1,
+  },
+  chatName: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  chatPreview: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  chatTime: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  chatMeta: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  groupBadge: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: '#f1f5f9',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#475569',
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  startChatButton: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  startChatButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  secondaryButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  footer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  footerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  footerText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
   },
 });

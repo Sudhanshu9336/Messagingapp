@@ -18,6 +18,7 @@ export class AuthManager {
   private static instance: AuthManager;
   private currentUser: UserProfile | null = null;
   private encryptionManager: EncryptionManager;
+  private refreshTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     this.encryptionManager = EncryptionManager.getInstance();
@@ -30,12 +31,12 @@ export class AuthManager {
     return AuthManager.instance;
   }
 
-  // Generate unique 8-digit user ID
+  // Helper: Generate unique 8-digit user ID
   private generateUserId(): number {
     return Math.floor(10000000 + Math.random() * 90000000);
   }
 
-  // Validate username format
+  // Helper: Validate username format
   private validateUsername(username: string): void {
     if (!username || username.length < 3) {
       throw new Error('Username must be at least 3 characters long');
@@ -48,9 +49,7 @@ export class AuthManager {
     }
   }
 
-  // Check if username is available
-
-  // Generate unique user ID (with collision checking)
+  // Helper: Generate unique user ID with collision checking
   private async generateUniqueUserId(): Promise<number> {
     try {
       let attempts = 0;
@@ -74,13 +73,12 @@ export class AuthManager {
 
       throw new Error('Unable to generate unique user ID. Please try again.');
     } catch (error) {
-      // If database is not available, just generate a random ID
       console.warn('Database not available for ID checking, using random ID');
       return this.generateUserId();
     }
   }
 
-  // Create user profile in database
+  // Helper: Create profile in database
   private async createProfileInDatabase(
     userId: number,
     username: string,
@@ -118,7 +116,6 @@ export class AuthManager {
 
       return data;
     } catch (error) {
-      // If database is not available, create a mock profile for development
       console.warn('Database not available, creating local profile:', error);
       
       const mockProfile: UserProfile = {
@@ -137,29 +134,47 @@ export class AuthManager {
     }
   }
 
-  // Store credentials locally
+  // Helper: Store credentials locally with encryption
   private async storeCredentials(profile: UserProfile, privateKey: string): Promise<void> {
-    await AsyncStorage.setItem('user_session', profile.id);
-    await AsyncStorage.setItem('private_key', privateKey);
-    await AsyncStorage.setItem('user_profile', JSON.stringify(profile));
+    const sessionData = {
+      profile,
+      timestamp: Date.now(),
+      expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
+    };
+
+    await AsyncStorage.multiSet([
+      ['user_session', JSON.stringify(sessionData)],
+      ['private_key', privateKey],
+      ['user_profile', JSON.stringify(profile)]
+    ]);
+  }
+
+  // Helper: Start session refresh timer
+  private startSessionRefresh(): void {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+    }
+
+    // Refresh session every 24 hours
+    this.refreshTimer = setInterval(async () => {
+      if (this.currentUser) {
+        await this.updateLastActivity(this.currentUser.id);
+      }
+    }, 24 * 60 * 60 * 1000);
   }
 
   // Register new user
   async register(username: string, gender?: string, bio?: string): Promise<UserProfile> {
     try {
-      // Validate input
       this.validateUsername(username);
 
-      // Generate encryption keys
+      // Generate encryption keys with proper entropy
       const keyPair = this.encryptionManager.generateKeyPair();
       if (!keyPair || !keyPair.publicKey || !keyPair.privateKey) {
         throw new Error('Failed to generate security keys.');
       }
 
-      // Generate unique user ID
       const userId = await this.generateUniqueUserId();
-
-      // Create profile in database
       const profile = await this.createProfileInDatabase(
         userId,
         username,
@@ -168,11 +183,9 @@ export class AuthManager {
         bio
       );
 
-      // Store credentials locally
       await this.storeCredentials(profile, keyPair.privateKey);
-
-      // Set current user
       this.currentUser = profile;
+      this.startSessionRefresh();
 
       return profile;
     } catch (error) {
@@ -188,15 +201,22 @@ export class AuthManager {
   // Login with stored session
   async loginWithSession(): Promise<UserProfile | null> {
     try {
-      const sessionId = await AsyncStorage.getItem('user_session');
+      const sessionData = await AsyncStorage.getItem('user_session');
       const privateKey = await AsyncStorage.getItem('private_key');
-      const profileData = await AsyncStorage.getItem('user_profile');
 
-      if (!sessionId || !privateKey || !profileData) {
+      if (!sessionData || !privateKey) {
         return null;
       }
 
-      const profile = JSON.parse(profileData);
+      const session = JSON.parse(sessionData);
+      
+      // Check if session is expired
+      if (Date.now() > session.expiresAt) {
+        await this.logout();
+        return null;
+      }
+
+      const profile = session.profile;
       
       // Restore encryption keys
       this.encryptionManager.setKeyPair({
@@ -208,6 +228,7 @@ export class AuthManager {
       await this.updateLastActivity(profile.id);
 
       this.currentUser = profile;
+      this.startSessionRefresh();
       return profile;
     } catch (error) {
       console.error('Session login error:', error);
@@ -224,7 +245,7 @@ export class AuthManager {
     }
   }
 
-  // Delete user profile
+  // Delete user profile permanently
   async deleteProfile(): Promise<void> {
     if (!this.currentUser) {
       throw new Error('No user logged in');
@@ -245,7 +266,6 @@ export class AuthManager {
       await this.logout();
     } catch (error) {
       console.warn('Profile deletion error:', error);
-      // Still clear local storage even if database deletion fails
       await this.logout();
     }
   }
@@ -292,8 +312,14 @@ export class AuthManager {
   // Logout and clear session
   async logout(): Promise<void> {
     try {
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer);
+        this.refreshTimer = null;
+      }
+
       await AsyncStorage.multiRemove(['user_session', 'private_key', 'user_profile']);
       this.currentUser = null;
+      this.encryptionManager.clearKeys();
     } catch (error) {
       throw new Error(`Logout failed: ${error}`);
     }

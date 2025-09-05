@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#25D366',
+    backgroundColor: '#2563eb',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -300,8 +300,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 8,
-    borderWidth: 2,
-    borderColor: '#eee',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   username: {
     fontSize: 24,
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   userIdContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f1f5f9',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   userId: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
+    color: '#64748b',
     marginLeft: 4,
     marginRight: 8,
   },
@@ -330,13 +330,13 @@ const styles = StyleSheet.create({
   },
   gender: {
     fontSize: 14,
-    color: '#999',
+    color: '#94a3b8',
   },
   bioSection: {
     paddingHorizontal: 20,
     paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#f1f5f9',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -347,29 +347,29 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#1e293b',
   },
   bioText: {
     fontSize: 14,
-    color: '#666',
+    color: '#64748b',
     lineHeight: 20,
   },
   bioEdit: {
     gap: 8,
   },
   bioInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderWidth: 0.5,
+    borderColor: '#e2e8f0',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
     fontSize: 14,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#fff',
     textAlignVertical: 'top',
   },
   bioCounter: {
     fontSize: 12,
-    color: '#999',
+    color: '#94a3b8',
     textAlign: 'right',
   },
   bioActions: {
@@ -386,13 +386,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cancelButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f1f5f9',
   },
   saveButton: {
-    backgroundColor: '#25D366',
+    backgroundColor: '#2563eb',
   },
   cancelButtonText: {
-    color: '#666',
+    color: '#64748b',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -405,12 +405,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 20,
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#f1f5f9',
   },
   qrDescription: {
     fontSize: 14,
-    color: '#666',
+    color: '#64748b',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -434,20 +434,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 16,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#dbeafe',
     borderRadius: 8,
     gap: 6,
   },
   qrActionText: {
-    color: '#25D366',
+    color: '#2563eb',
     fontSize: 14,
     fontWeight: '500',
   },
   securitySection: {
     paddingHorizontal: 20,
     paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#f1f5f9',
   },
   securityItem: {
     flexDirection: 'row',
@@ -461,12 +461,12 @@ const styles = StyleSheet.create({
   securityTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: '#1e293b',
     marginBottom: 4,
   },
   securityText: {
     fontSize: 12,
-    color: '#666',
+    color: '#64748b',
     lineHeight: 16,
   },
   actions: {
@@ -490,14 +490,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   logoutButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f1f5f9',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
     alignItems: 'center',
   },
   logoutButtonText: {
-    color: '#666',
+    color: '#64748b',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
-    color: '#999',
+    color: '#94a3b8',
     marginBottom: 4,
   },
 });

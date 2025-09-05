@@ -7,13 +7,13 @@ const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 // Validate credentials
 if (!supabaseUrl || !supabaseKey) {
-  console.error('Supabase credentials are missing in environment variables');
+  console.warn('Supabase credentials are missing in environment variables. Using fallback configuration for development.');
 }
 
 // Create client with error handling
 export const supabase = createClient<Database>(
-  supabaseUrl || '',
-  supabaseKey || '',
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseKey || 'placeholder-key',
   {
     auth: {
       persistSession: true,

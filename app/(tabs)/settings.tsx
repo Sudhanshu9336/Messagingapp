@@ -200,6 +200,13 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      <SettingsItem
+        icon={<Shield size={22} color="#2563eb" />}
+        title="Theme"
+        subtitle="Modern blue theme (ChatGPT-inspired)"
+        showArrow={false}
+      />
     </View>
   );
 }
@@ -207,19 +214,20 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#e2e8f0',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1e293b',
   },
   content: {
     flex: 1,
@@ -230,7 +238,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: '#64748b',
     paddingHorizontal: 20,
     paddingVertical: 16,
     textTransform: 'uppercase',
@@ -243,8 +251,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#f1f5f9',
   },
   settingsItemLeft: {
     flexDirection: 'row',
@@ -255,7 +263,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -266,12 +274,12 @@ const styles = StyleSheet.create({
   settingsTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: '#1e293b',
     marginBottom: 2,
   },
   settingsSubtitle: {
     fontSize: 13,
-    color: '#666',
+    color: '#64748b',
     lineHeight: 16,
   },
   settingsItemRight: {
@@ -286,7 +294,7 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 12,
-    color: '#999',
+    color: '#94a3b8',
     marginBottom: 4,
     textAlign: 'center',
   },
