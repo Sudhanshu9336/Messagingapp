@@ -38,18 +38,37 @@ export class AuthManager {
   // Register new user
   async register(username: string, gender?: string, bio?: string): Promise<UserProfile> {
     try {
+      // Validate username
+      if (!username || username.length < 3) {
+        throw new Error('Username must be at least 3 characters long');
+      }
+
+      // Check network connectivity first
+      const { data: networkCheck, error: networkError } = await supabase
+        .from('profiles')
+        .select('count')
+        .limit(1);
+      
+      if (networkError) {
+        throw new Error('Network connection failed. Please check your internet connection.');
+      }
+
       // Check if username already exists
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error: searchError } = await supabase
         .from('profiles')
         .select('username')
         .eq('username', username)
         .single();
 
+      if (searchError && searchError.code !== 'PGRST116') {
+        throw new Error('Database error. Please try again.');
+      }
+
       if (existingUser) {
         throw new Error('Username already taken. Please choose a different username.');
       }
 
-      // Generate encryption key pair
+      // Generate encryption key pair with enhanced security
       const keyPair = this.encryptionManager.generateKeyPair();
       
       // Generate unique user ID and check for conflicts

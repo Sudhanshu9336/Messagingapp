@@ -19,7 +19,16 @@ export class EncryptionManager {
 
   // Generate key pair for user
   generateKeyPair(): KeyPair {
-    const privateKey = CryptoJS.lib.WordArray.random(32).toString();
+    // Generate a strong private key with additional entropy
+    const timestamp = new Date().getTime().toString();
+    const random = CryptoJS.lib.WordArray.random(32);
+    const entropy = CryptoJS.lib.WordArray.random(16);
+    
+    const privateKey = CryptoJS.SHA256(
+      random.toString() + timestamp + entropy.toString()
+    ).toString();
+    
+    // Generate public key from private key
     const publicKey = CryptoJS.SHA256(privateKey).toString();
     
     this.keyPair = { publicKey, privateKey };
