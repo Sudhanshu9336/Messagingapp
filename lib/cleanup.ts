@@ -1,4 +1,5 @@
 import { AuthManager } from './auth';
+import { supabase } from './supabase';
 
 export class CleanupManager {
   private static instance: CleanupManager;
@@ -40,10 +41,22 @@ export class CleanupManager {
   private async performCleanup(): Promise<void> {
     try {
       console.log('Starting cleanup of inactive profiles...');
-      await AuthManager.cleanupInactiveProfiles();
+      await supabase.rpc('cleanup_inactive_profiles_default');
       console.log('Cleanup completed successfully');
     } catch (error) {
       console.error('Cleanup process failed:', error);
+      throw error;
+    }
+  }
+
+  // Perform cleanup with custom cutoff period
+  async performCleanupWithCutoff(cutoff: string = '30 days'): Promise<void> {
+    try {
+      console.log(`Starting cleanup of inactive profiles with cutoff: ${cutoff}...`);
+      await supabase.rpc('cleanup_inactive_profiles_with_cutoff', { p_cutoff: cutoff });
+      console.log('Cleanup with cutoff completed successfully');
+    } catch (error) {
+      console.error('Cleanup with cutoff process failed:', error);
       throw error;
     }
   }
