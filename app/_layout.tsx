@@ -10,8 +10,7 @@ import { useEffect } from 'react';
 
 // --- Project imports ---
 import { markActive } from '../lib/activity'; // ⬅ adjust path if lib is in app/
-import { useAuth } from '../lib/auth';        // ⬅ adjust path if lib is in app/
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 // --- Expo Router ---
