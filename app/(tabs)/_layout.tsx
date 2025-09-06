@@ -36,6 +36,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="qr-scanner"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',

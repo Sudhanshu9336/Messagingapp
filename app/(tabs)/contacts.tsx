@@ -12,8 +12,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthManager, UserProfile } from '@/lib/auth';
 import { QRManager, QRUserData } from '@/lib/qr';
-import { Search, UserPlus, QrCode, Users, MessageCircle, Plus } from 'lucide-react-native';
+import { Search, UserPlus, QrCode, Users, Plus } from 'lucide-react-native';
 import { ChatManager } from '@/lib/chat';
+import { router as expoRouter } from 'expo-router';
 
 export default function ContactsScreen() {
   const { user } = useAuth();
@@ -79,35 +80,37 @@ export default function ContactsScreen() {
   };
 
   const handleQRConnect = async () => {
-    if (!qrInput.trim()) {
-      Alert.alert('Error', 'Please enter QR code data');
-      return;
-    }
+    if (qrInput.trim()) {
+      // Handle manual QR input
+      try {
+        const qrData = QRManager.parseQRData(qrInput.trim());
+        if (!qrData) {
+          Alert.alert('Error', 'Invalid QR code data');
+          return;
+        }
 
-    try {
-      const qrData = QRManager.parseQRData(qrInput.trim());
-      if (!qrData) {
-        Alert.alert('Error', 'Invalid QR code data');
-        return;
+        const contact = await authManager.getUserById(qrData.userId);
+        if (!contact) {
+          Alert.alert('Error', 'User not found');
+          return;
+        }
+
+        if (contact.id === user?.id) {
+          Alert.alert('Error', 'Cannot add yourself as a contact');
+          return;
+        }
+
+        // Connect with the user
+        await handleConnect(contact);
+        setShowQRModal(false);
+        setQrInput('');
+      } catch (error) {
+        Alert.alert('Error', 'Failed to connect with user');
       }
-
-      const contact = await authManager.getUserById(qrData.userId);
-      if (!contact) {
-        Alert.alert('Error', 'User not found');
-        return;
-      }
-
-      if (contact.id === user?.id) {
-        Alert.alert('Error', 'Cannot add yourself as a contact');
-        return;
-      }
-
-      // Connect with the user
-      await handleConnect(contact);
+    } else {
+      // Open camera scanner
       setShowQRModal(false);
-      setQrInput('');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to connect with user');
+      expoRouter.push('/(tabs)/qr-scanner');
     }
   };
 
@@ -173,7 +176,11 @@ export default function ContactsScreen() {
       <View style={styles.quickActions}>
         <TouchableOpacity 
           style={styles.actionButton}
-          onPress={() => setShowQRModal(true)}
+          onPress={() => {
+            setTimeout(() => {
+              expoRouter.push('/(tabs)/qr-scanner');
+            }, 100);
+          }}
         >
           <QrCode size={20} color="#2563eb" />
           <Text style={styles.actionButtonText}>Scan QR Code</Text>
@@ -218,22 +225,30 @@ export default function ContactsScreen() {
             <TouchableOpacity onPress={() => setShowQRModal(false)}>
               <Text style={styles.modalCancel}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Connect via QR Code</Text>
+            <Text style={styles.modalTitle}>Add Contact</Text>
             <TouchableOpacity onPress={handleQRConnect}>
-              <Text style={styles.modalDone}>Start Chat</Text>
+              <Text style={styles.modalDone}>Connect</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.modalContent}>
-            <View style={styles.qrScanArea}>
+            <TouchableOpacity 
+              style={styles.qrScanArea}
+              onPress={() => {
+                setShowQRModal(false);
+                setTimeout(() => {
+                  expoRouter.push('/(tabs)/qr-scanner');
+                }, 100);
+              }}
+            >
               <QrCode size={80} color="#ddd" />
               <Text style={styles.qrScanText}>
-                QR Code Scanner would appear here
+                Tap to Open Camera Scanner
               </Text>
               <Text style={styles.qrScanSubtext}>
-                In a real app, this would use the camera to scan QR codes
+                Use your camera to scan QR codes instantly
               </Text>
-            </View>
+            </TouchableOpacity>
 
             <Text style={styles.orText}>Or paste QR code data:</Text>
 
@@ -428,6 +443,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 40,
     marginBottom: 30,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
   },
   qrScanText: {
     fontSize: 16,
