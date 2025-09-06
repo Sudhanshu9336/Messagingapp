@@ -1,4 +1,5 @@
 import { AuthManager } from './auth';
+import { supabase } from './supabase';
 
 export class CleanupManager {
   private static instance: CleanupManager;
@@ -40,7 +41,7 @@ export class CleanupManager {
   private async performCleanup(): Promise<void> {
     try {
       console.log('Starting cleanup of inactive profiles...');
-      await AuthManager.cleanupInactiveProfiles();
+      await supabase.rpc('cleanup_inactive_profiles');
       console.log('Cleanup completed successfully');
     } catch (error) {
       console.error('Cleanup process failed:', error);

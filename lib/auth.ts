@@ -3,12 +3,6 @@ import { EncryptionManager } from './encryption';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { markActive } from './activity';
 
-// after successful login
-if (profileId) {
-  markActive(profileId);
-}
-
-
 export interface UserProfile {
   id: string;
   user_id: number;
