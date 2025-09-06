@@ -371,24 +371,34 @@ export class ChatManager {
     if (!currentUser) return [];
 
     try {
-      const { data: chats, error } = await supabase
-        .from('chats')
-        .select(`
-          *,
-          chat_participants(
-            *,
-            profiles(*)
-          )
-        `)
-        .in('id', 
-          supabase
-            .from('chat_participants')
-            .select('chat_id')
-            .eq('user_id', currentUser.id)
-        );
+      // 1. Get the chat IDs where the user participates
+const { data: chatIds, error: chatIdsError } = await supabase
+  .from('chat_participants')
+  .select('chat_id')
+  .eq('user_id', currentUser.id);
 
-      if (error) throw error;
-      return chats || [];
+if (chatIdsError) throw chatIdsError;
+
+const ids = (chatIds || []).map(c => c.chat_id);
+
+if (ids.length === 0) return [];
+
+// 2. Fetch chats for those IDs
+const { data: chats, error: chatsError } = await supabase
+  .from('chats')
+  .select(`
+    *,
+    chat_participants(
+      *,
+      profiles(*)
+    )
+  `)
+  .in('id', ids);
+
+if (chatsError) throw chatsError;
+
+return chats || [];
+
     } catch (error) {
       console.error('Failed to get chats:', error);
       return [];
