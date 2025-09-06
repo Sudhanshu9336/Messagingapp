@@ -198,51 +198,139 @@ export class ChatManager {
     }
 
     try {
-      // Validate participant IDs - they should be profile UUIDs
+      // Validate participant IDs and convert user_ids to profile UUIDs if needed
       if (!participantIds || participantIds.length === 0) {
         throw new Error('At least one participant is required');
       }
 
-      // Verify participants exist in the database
+      // Check if participantIds are user_ids (numbers) or profile UUIDs
+      const profileIds: string[] = [];
+      
+      for (const participantId of participantIds) {
+        // If it's a number, it's a user_id, so we need to get the profile UUID
+        if (!isNaN(Number(participantId))) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, username, public_key')
+            .eq('user_id', parseInt(participantId))
+            .single();
+            
+          if (profileError || !profile) {
+            throw new Error(`User with ID ${participantId} not found`);
+          }
+          profileIds.push(profile.id);
+        } else {
+          // It's already a UUID, verify it exists
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, username, public_key')
+            .eq('id', participantId)
+            .single();
+            
+          if (profileError || !profile) {
+            throw new Error(`Profile with ID ${participantId} not found`);
+          }
+          profileIds.push(profile.id);
+        }
+      }
+
+      // Verify all participants exist
       const { data: participants, error: participantsError } = await supabase
         .from('profiles')
         .select('id, username, public_key')
-        .in('id', participantIds);
+        .in('id', profileIds);
 
-      if (participantsError) {
+      if (participantsError || !participants) {
         console.error('Error fetching participants:', participantsError);
         throw new Error('Failed to verify participants');
       }
 
-      if (!participants || participants.length !== participantIds.length) {
+      if (participants.length !== profileIds.length) {
         throw new Error('One or more participants not found');
       }
 
       // For direct messages, check if chat already exists
-      if (!isGroup && participantIds.length === 1) {
-        const existingChat = this.findExistingDirectChat(currentUser.id, participantIds[0]);
-        if (existingChat) {
-          return existingChat;
+      if (!isGroup && profileIds.length === 1) {
+        const { data: existingChat, error: existingChatError } = await supabase
+          .from('chats')
+          .select(`
+            *,
+            chat_participants!inner(user_id)
+          `)
+          .eq('is_group', false)
+          .not('chat_participants.user_id', 'is', null);
+          
+        if (existingChat && !existingChatError) {
+          // Check if this chat has exactly the two participants we want
+          for (const chat of existingChat) {
+            const chatParticipants = (chat as any).chat_participants.map((p: any) => p.user_id);
+            if (chatParticipants.length === 2 && 
+                chatParticipants.includes(currentUser.id) && 
+                chatParticipants.includes(profileIds[0])) {
+              // Convert to our Chat interface
+              const existingChatData: Chat = {
+                id: chat.id,
+                name: chat.name,
+                is_group: chat.is_group,
+                created_by: chat.created_by,
+                participants: chatParticipants,
+                created_at: chat.created_at,
+                updated_at: chat.updated_at,
+              };
+              return existingChatData;
+            }
+          }
         }
       }
 
-      // Create new chat
-      const chatId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const allParticipants = [currentUser.id, ...participantIds];
+      // Create new chat in database
+      const { data: newChatData, error: chatError } = await supabase
+        .from('chats')
+        .insert({
+          name: isGroup ? name : null,
+          is_group: isGroup,
+          created_by: currentUser.id,
+        })
+        .select()
+        .single();
+
+      if (chatError || !newChatData) {
+        console.error('Chat creation error:', chatError);
+        throw new Error('Failed to create chat in database');
+      }
+
+      // Add participants to the chat
+      const allParticipants = [currentUser.id, ...profileIds];
+      const participantInserts = allParticipants.map(userId => ({
+        chat_id: newChatData.id,
+        user_id: userId,
+        role: userId === currentUser.id ? 'admin' : 'member',
+      }));
+
+      const { error: participantsInsertError } = await supabase
+        .from('chat_participants')
+        .insert(participantInserts);
+
+      if (participantsInsertError) {
+        console.error('Participants insert error:', participantsInsertError);
+        // Try to clean up the chat if participant insertion failed
+        await supabase.from('chats').delete().eq('id', newChatData.id);
+        throw new Error('Failed to add participants to chat');
+      }
 
       const newChat: Chat = {
-        id: chatId,
+        id: newChatData.id,
         name: isGroup ? name : undefined,
         is_group: isGroup,
         created_by: currentUser.id,
         participants: allParticipants,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: newChatData.created_at,
+        updated_at: newChatData.updated_at,
       };
 
       // Store chat locally
-      this.chats.set(chatId, newChat);
-      this.messages.set(chatId, []);
+      this.chats.set(newChat.id, newChat);
+      this.messages.set(newChat.id, []);
       
       // Save to storage
       await this.saveChatsToStorage();
@@ -253,7 +341,11 @@ export class ChatManager {
       return newChat;
     } catch (error) {
       console.error('Chat creation error:', error);
-      throw new Error(`Failed to create chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Failed to create chat: Unknown error');
+      }
     }
   }
 
@@ -398,15 +490,66 @@ export class ChatManager {
     if (!currentUser) return [];
 
     try {
-      // Filter chats where current user is a participant
-      const userChats = Array.from(this.chats.values())
-        .filter(chat => chat.participants.includes(currentUser.id))
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      // Get chats from database where user is a participant
+      const { data: chatData, error: chatsError } = await supabase
+        .from('chats')
+        .select(`
+          *,
+          chat_participants!inner(user_id, role)
+        `)
+        .eq('chat_participants.user_id', currentUser.id)
+        .order('updated_at', { ascending: false });
+
+      if (chatsError) {
+        console.error('Error fetching chats:', chatsError);
+        // Fallback to local storage
+        const userChats = Array.from(this.chats.values())
+          .filter(chat => chat.participants.includes(currentUser.id))
+          .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        return userChats;
+      }
+
+      if (!chatData) return [];
+
+      // Convert to Chat interface and get all participants for each chat
+      const userChats: Chat[] = [];
+      
+      for (const chat of chatData) {
+        // Get all participants for this chat
+        const { data: allParticipants } = await supabase
+          .from('chat_participants')
+          .select('user_id')
+          .eq('chat_id', chat.id);
+
+        const participantIds = allParticipants?.map(p => p.user_id) || [];
+
+        const chatObj: Chat = {
+          id: chat.id,
+          name: chat.name,
+          is_group: chat.is_group,
+          created_by: chat.created_by,
+          participants: participantIds,
+          created_at: chat.created_at,
+          updated_at: chat.updated_at,
+        };
+
+        userChats.push(chatObj);
+        
+        // Also store locally for offline access
+        this.chats.set(chat.id, chatObj);
+      }
+
+      // Save to local storage
+      await this.saveChatsToStorage();
 
       return userChats;
     } catch (error) {
       console.error('Failed to get chats:', error);
-      return [];
+      // Fallback to local storage
+      const userChats = Array.from(this.chats.values())
+        .filter(chat => chat.participants.includes(currentUser.id))
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      return userChats;
     }
   }
 
